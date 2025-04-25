@@ -1,0 +1,150 @@
+name: OpenWrt Release Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      message:
+        description: 'Release 描述'
+        required: false
+        default: 'Auto-generated OpenWRT build release'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        build_type: [Main, Bypass]
+
+    outputs:
+      main_output: ${{ steps.export.outputs.main_output }}
+      bypass_output: ${{ steps.export.outputs.bypass_output }}
+
+    name: Build OpenWRT ${{ matrix.build_type }}
+
+    steps:
+    - name: Checkout current repository
+      uses: actions/checkout@v4
+
+    - name: Check config file exists
+      run: |
+        CONFIG_FILE="config/${{ matrix.build_type }}"
+        if [ ! -f "$CONFIG_FILE" ]; then
+          echo "❌ 配置文件 $CONFIG_FILE 不存在"
+          exit 1
+        fi
+
+    - name: Clone OpenWRT source
+      run: git clone --depth=1 https://github.com/openwrt/openwrt.git
+
+    - name: Install build dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential clang flex bison g++ gawk gcc-multilib g++-multilib \
+          gettext git libncurses5-dev libssl-dev python3-setuptools \
+          rsync swig unzip zlib1g-dev file wget
+
+    - name: Free up disk space
+      run: |
+        sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
+        sudo apt-get clean
+
+    - name: Apply patch
+      working-directory: ./openwrt
+      run: |
+        echo "🔧 当前构建类型: ${{ matrix.build_type }}"
+        bash ../scripts/patch_openwrt.sh "${{ matrix.build_type }}"
+
+    - name: Update feeds
+      working-directory: ./openwrt
+      run: |
+        ./scripts/feeds update -a
+        ./scripts/feeds install -a
+
+    - name: Install themes & tools
+      working-directory: ./openwrt
+      run: bash ../scripts/luci-theme-argon.sh
+
+    - name: Install luci-app-openclash
+      if: matrix.build_type == 'Bypass'
+      working-directory: ./openwrt
+      run: bash ../scripts/luci-app-openclash.sh
+
+    - name: Build OpenWRT
+      working-directory: ./openwrt
+      run: |
+        CONFIG_FILE="../config/${{ matrix.build_type }}"
+        cp "$CONFIG_FILE" .config
+        make defconfig
+        make download -j"$(nproc)" || make download -j1 V=s
+        make -j"$(nproc)" || make -j1 V=s
+
+    - name: Upload simulated build artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.build_type }}-img
+        path: openwrt/bin/targets/x86/64/*.img.gz
+
+    - name: Export artifact path
+      id: export
+      working-directory: ./openwrt
+      run: |
+        PREFIX=$(echo "${{ matrix.build_type }}" | tr '[:upper:]' '[:lower:]')
+        FILE_PATH=$(find bin/targets/x86/64 -name "${PREFIX}-x86-64-generic-squashfs-combined-efi.img.gz" | head -n1)
+        echo "FILE_PATH=$FILE_PATH"
+        echo "${{ matrix.build_type }}_output=$FILE_PATH" >> $GITHUB_OUTPUT
+
+    # - name: Simulate OpenWRT build
+    #   working-directory: ./openwrt
+    #   run: |
+    #     PREFIX=$(echo "${{ matrix.build_type }}" | tr '[:upper:]' '[:lower:]')
+    #     mkdir -p bin/targets/x86/64/
+    #     touch "bin/targets/x86/64/${PREFIX}-x86-64-generic-squashfs-combined-efi.img.gz"
+    #     echo "Simulated image for $PREFIX" > "bin/targets/x86/64/${PREFIX}-x86-64-generic-squashfs-combined-efi.img.gz"
+    #     echo "🧪 模拟生成构建产物: bin/targets/x86/64/${PREFIX}-x86-64-generic-squashfs-combined-efi.img.gz"
+
+    # - name: Upload simulated build artifact
+    #   uses: actions/upload-artifact@v4
+    #   with:
+    #     name: ${{ matrix.build_type }}-img
+    #     path: openwrt/bin/targets/x86/64/*.img.gz
+    
+    # - name: Export artifact path
+    #   id: export
+    #   working-directory: ./openwrt
+    #   run: |
+    #     PREFIX=$(echo "${{ matrix.build_type }}" | tr '[:upper:]' '[:lower:]')
+    #     FILE_PATH="bin/targets/x86/64/${PREFIX}-x86-64-generic-squashfs-combined-efi.img.gz"
+    #     echo "FILE_PATH=$FILE_PATH"
+    #     echo "${{ matrix.build_type }}_output=$FILE_PATH" >> $GITHUB_OUTPUT
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    name: Publish GitHub Release
+
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./downloads
+      
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: openwrt-${{ github.run_number }}
+          name: "OpenWRT Multi-Build #${{ github.run_number }}"
+          files: ./downloads/**/*.img.gz
+          body: |
+            📦 自动发布版本（Main & Bypass）
+      
+            ✅ Main 构建产物:
+            main-x86-64-generic-squashfs-combined-efi.img.gz
+      
+            ✅ Bypass 构建产物:
+            bypass-x86-64-generic-squashfs-combined-efi.img.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
