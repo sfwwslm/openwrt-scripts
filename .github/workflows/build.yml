@@ -68,7 +68,15 @@ jobs:
       working-directory: ./openwrt
       run: bash ../scripts/luci-theme-argon.sh
 
-    - name: Install luci-app-openclash
+    - name: Install firmware files (Main only)
+      if: matrix.build_type == 'Main'
+      working-directory: ./openwrt
+      run: |
+        mkdir -p files/lib/firmware
+        wget https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/iwlwifi-so-a0-gf-a0-89.ucode -P files/lib/firmware
+        wget https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/iwlwifi-so-a0-gf-a0.pnvm -P files/lib/firmware
+
+    - name: Install luci-app-openclash (Bypass only)
       if: matrix.build_type == 'Bypass'
       working-directory: ./openwrt
       run: bash ../scripts/luci-app-openclash.sh
