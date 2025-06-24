@@ -4,10 +4,10 @@ set -e
 echo "🧼 正在还原 OpenWRT 原始配置..."
 
 # 还原 os-release
-sed -i 's|OPENWRT_RELEASE="GWJ %V %C"|OPENWRT_RELEASE="%D %V %C"|' package/base-files/files/usr/lib/os-release
+sed -i 's|OPENWRT_RELEASE="sfwwslm %V %C"|OPENWRT_RELEASE="%D %V %C"|' package/base-files/files/usr/lib/os-release
 
 # 还原 luci 界面名称
-sed -i "s|DISTRIB_DESCRIPTION='GWJ %V %C'|DISTRIB_DESCRIPTION='%D %V %C'|" package/base-files/files/etc/openwrt_release
+sed -i "s|DISTRIB_DESCRIPTION='sfwwslm %V %C'|DISTRIB_DESCRIPTION='%D %V %C'|" package/base-files/files/etc/openwrt_release
 
 # 还原默认 IP 地址
 sed -i 's|lan) ipad=${ipaddr:-"10.0.0.250"} ;;|lan) ipad=${ipaddr:-"192.168.1.1"} ;;|' package/base-files/files/bin/config_generate
