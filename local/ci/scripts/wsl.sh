@@ -1,6 +1,6 @@
 #!/bin/bash
 
-CFG_FILE=package/base-files/files/bin/config_generate
+# CFG_FILE=package/base-files/files/bin/config_generate
 
 # 检查是否提供了第二个参数
 if [[ -z "$2" ]]; then
@@ -15,7 +15,7 @@ else
 fi
 
 # 修改配置文件中的主机名
-sed -i "s/hostname='.*'/hostname='$HOSTNAME'/g" "$CFG_FILE"
+# sed -i "s/hostname='.*'/hostname='$HOSTNAME'/g" "$CFG_FILE"
 echo "主机名已设置为: $HOSTNAME. 5秒后开始编译！"
 
 mkdir -p files/lib/firmware
@@ -31,5 +31,5 @@ then
     echo "编译失败，请检查错误信息。"
 fi
 
-sed -i "s/hostname='.*'/hostname='OpenWrt'/g" "$CFG_FILE"
-echo "已恢复配置文件中的主机名"
+# sed -i "s/hostname='.*'/hostname='OpenWrt'/g" "$CFG_FILE"
+# echo "已恢复配置文件中的主机名"
