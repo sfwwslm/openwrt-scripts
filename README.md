@@ -1,3 +1,6 @@
 # 使用说明
 
-把`local`目录软连接到 `openwrt` 目录中执行脚本
+```bash
+ln -s  ~/codes/openwrt-scripts/local/ci ci
+chmod +x ci/script/*
+```
